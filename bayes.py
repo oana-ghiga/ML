@@ -3,6 +3,8 @@ import string
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 import re
 import nltk
 
@@ -17,6 +19,7 @@ main_directory = os.path.join(os.getcwd(), 'lingspam_public')
 data = []
 labels = []
 accuracies = []
+predicted_labels = []
 
 for subdir in ['bare', 'lemm', 'lemm_stop', 'stop']:
     subdir_path = os.path.join(main_directory, subdir)
@@ -132,9 +135,21 @@ for index, _ in df.iterrows():
     # Calculate accuracy for this iteration
     accuracy = (test_data['Label'] == test_data['Predicted']).mean()
     accuracies.append(accuracy)
+    predicted_labels.extend(test_data['Predicted'])
+
+df['Predicted'] = predicted_labels
 
 # Calculate average accuracy
 avg_accuracy = np.mean(accuracies)
+
+# Confusion Matrix
+conf_matrix = confusion_matrix(df['Label'], df['Predicted'])
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Non-Spam', 'Spam'], yticklabels=['Non-Spam', 'Spam'])
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
 
 # Print average accuracy
 print(f"Average Accuracy using LOOCV: {avg_accuracy}")

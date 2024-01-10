@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 import re
 import nltk
 
@@ -18,6 +20,7 @@ main_directory = os.path.join(os.getcwd(), 'lingspam_public')
 data = []
 labels = []
 accuracies = []
+predicted_labels = []
 
 for subdir in ['bare', 'lemm', 'lemm_stop', 'stop']:
     subdir_path = os.path.join(main_directory, subdir)
@@ -46,7 +49,7 @@ def remove_punctuation(text):
 
 # Function to tokenize text
 def tokenize(text):
-    tokens = re.split("\W+", text)# W+ means all capital, small alphabets and integers 0-9
+    tokens = re.split("\W+", text)
     return tokens
 
 # Function to remove stop words
@@ -120,15 +123,25 @@ for index, _ in df.iterrows():
     # Make predictions on the test set
     priors = train_data['Label'].value_counts(normalize=True).to_dict()
     test_data['Predicted'] = test_data['Text'].apply(lambda x: predict(x, priors, conditional_probs))
-    print(test_data[['Label', 'Predicted']])
-    print("Done")
 
     # Calculate accuracy for this iteration
     accuracy = (test_data['Label'] == test_data['Predicted']).mean()
     accuracies.append(accuracy)
+    predicted_labels.extend(test_data['Predicted'])
+
+df['Predicted'] = predicted_labels
 
 # Calculate average accuracy
 avg_accuracy = np.mean(accuracies)
+
+# Confusion Matrix
+conf_matrix = confusion_matrix(df['Label'], df['Predicted'])
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Non-Spam', 'Spam'], yticklabels=['Non-Spam', 'Spam'])
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
 
 # Print average accuracy
 print(f"Average Accuracy using LOOCV: {avg_accuracy}")
