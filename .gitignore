@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Generated folders / auxiliary files
+.idea
+test_functions.py
+
 # Distribution / packaging
 .Python
 build/

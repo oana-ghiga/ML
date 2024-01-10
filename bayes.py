@@ -3,6 +3,15 @@ import string
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import re
+import nltk
+
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+stopwords = nltk.corpus.stopwords.words("english")
+ps = nltk.PorterStemmer()
+wn = nltk.WordNetLemmatizer()
 
 main_directory = os.path.join(os.getcwd(), 'lingspam_public')
 data = []
@@ -24,11 +33,43 @@ for subdir in ['bare', 'lemm', 'lemm_stop', 'stop']:
 # Create a DataFrame to store data and labels
 df = pd.DataFrame({'Text': data, 'Label': labels})
 
+# Function to tokenize text
+def tokenize(text):
+    tokens = re.split("\W+", text)
+    return tokens
+
 # Function to preprocess text
-def preprocess(text):
+def remove_punctuation(text):
     text = text.translate(str.maketrans('', '', string.punctuation)).lower()
-    # Add additional preprocessing steps here (e.g., remove stopwords, lemmatization)
     return text
+
+# Function to tokenize text
+def tokenize(text):
+    tokens = re.split("\W+", text)# W+ means all capital, small alphabets and integers 0-9
+    return tokens
+
+# Function to remove stop words
+def remove_stopwords(token):
+    text = [word for word in token if word not in stopwords]# to remove all stopwords
+    return text
+
+# Function to stem words
+def stemming(text):
+    stem_text = [ps.stem(word) for word in text]
+    return stem_text
+
+# Function to lemmatize
+def lemmatizer(text):
+    lem_text = [wn.lemmatize(word) for word in text]
+    return lem_text
+
+def preprocess(text):
+    text_no_punct = remove_punctuation(text)
+    tokens = tokenize(text_no_punct)
+    stemmed_tokens = stemming(tokens)
+    lemmatized_tokens = lemmatizer(stemmed_tokens)
+
+    return lemmatized_tokens
 
 # Apply preprocessing to the 'Text' column
 df['Text'] = df['Text'].apply(preprocess)
@@ -38,17 +79,17 @@ priors = df['Label'].value_counts(normalize=True).to_dict()
 
 # Calculate conditional probabilities
 def calculate_conditional_probs(data):
-    vocab = set(' '.join(data['Text']).split())
+    vocab = set(word for tokens in data['Text'] for word in tokens)
     conditional_probs = {word: {0: 0, 1: 0} for word in vocab}
     for _, row in data.iterrows():
-        words = row['Text'].split()
+        words = row['Text']
         label = row['Label']
         for word in words:
             conditional_probs[word][label] += 1
 
     total_spam = data['Label'].sum()
     total_ham = len(data) - total_spam
-    for word, counts in conditional_probs.items():
+    for word in conditional_probs:
         conditional_probs[word][0] = (conditional_probs[word][0] + 1) / (total_ham + len(vocab))
         conditional_probs[word][1] = (conditional_probs[word][1] + 1) / (total_spam + len(vocab))
 
@@ -57,14 +98,12 @@ def calculate_conditional_probs(data):
 conditional_probs = calculate_conditional_probs(df)
 
 # Function to predict labels
-def predict(text, priors, conditional_probs):
-    text = preprocess(text)
-    words = text.split()
+def predict(tokens, priors, conditional_probs):
     scores = {label: np.log(priors[label]) for label in priors}
-    for word in words:
-        if word in conditional_probs:
+    for token in tokens:
+        if token in conditional_probs:
             for label in priors:
-                scores[label] += np.log(conditional_probs[word][label])
+                scores[label] += np.log(conditional_probs[token][label])
     return max(scores, key=scores.get)
 
 # Make a copy of the test data to avoid SettingWithCopyWarning

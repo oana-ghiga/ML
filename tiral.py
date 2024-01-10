@@ -4,6 +4,15 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import re
+import nltk
+
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+stopwords = nltk.corpus.stopwords.words("english")
+ps = nltk.PorterStemmer()
+wn = nltk.WordNetLemmatizer()
 
 main_directory = os.path.join(os.getcwd(), 'lingspam_public')
 data = []
@@ -25,11 +34,43 @@ for subdir in ['bare', 'lemm', 'lemm_stop', 'stop']:
 # Create a DataFrame to store data and labels
 df = pd.DataFrame({'Text': data, 'Label': labels})
 
+# Function to tokenize text
+def tokenize(text):
+    tokens = re.split("\W+", text)
+    return tokens
+
 # Function to preprocess text
-def preprocess(text):
+def remove_punctuation(text):
     text = text.translate(str.maketrans('', '', string.punctuation)).lower()
-    # Add additional preprocessing steps here (e.g., remove stopwords, lemmatization)
     return text
+
+# Function to tokenize text
+def tokenize(text):
+    tokens = re.split("\W+", text)# W+ means all capital, small alphabets and integers 0-9
+    return tokens
+
+# Function to remove stop words
+def remove_stopwords(token):
+    text = [word for word in token if word not in stopwords]# to remove all stopwords
+    return text
+
+# Function to stem words
+def stemming(text):
+    stem_text = [ps.stem(word) for word in text]
+    return stem_text
+
+# Function to lemmatize
+def lemmatizer(text):
+    lem_text = [wn.lemmatize(word) for word in text]
+    return lem_text
+
+def preprocess(text):
+    text_no_punct = remove_punctuation(text)
+    tokens = tokenize(text_no_punct)
+    stemmed_tokens = stemming(tokens)
+    lemmatized_tokens = lemmatizer(stemmed_tokens)
+
+    return lemmatized_tokens
 
 # Apply preprocessing to the 'Text' column
 df['Text'] = df['Text'].apply(preprocess)
@@ -43,7 +84,7 @@ def calculate_conditional_probs(data):
     word_counts = defaultdict(lambda: [0, 0])
 
     for _, row in data.iterrows():
-        words = set(row['Text'].split())
+        words = row['Text']
         label = row['Label']
         for word in words:
             word_counts[word][label] += 1
@@ -62,13 +103,11 @@ def calculate_conditional_probs(data):
 conditional_probs = calculate_conditional_probs(df)
 
 # Function to predict labels
-def predict(text, priors, conditional_probs):
-    text = preprocess(text)
-    words = set(text.split())
+def predict(tokens, priors, conditional_probs):
     scores = {label: np.log(priors[label]) for label in priors}
-    for word in words:
-        if word in conditional_probs:
-            for label, prob in enumerate(conditional_probs[word]):
+    for token in tokens:
+        if token in conditional_probs:
+            for label, prob in enumerate(conditional_probs[token]):
                 scores[label] += np.log(prob)
     return max(scores, key=scores.get)
 
@@ -81,6 +120,8 @@ for index, _ in df.iterrows():
     # Make predictions on the test set
     priors = train_data['Label'].value_counts(normalize=True).to_dict()
     test_data['Predicted'] = test_data['Text'].apply(lambda x: predict(x, priors, conditional_probs))
+    print(test_data[['Label', 'Predicted']])
+    print("Done")
 
     # Calculate accuracy for this iteration
     accuracy = (test_data['Label'] == test_data['Predicted']).mean()
@@ -94,9 +135,10 @@ print(f"Average Accuracy using LOOCV: {avg_accuracy}")
 
 # Plot histogram of accuracies
 plt.figure(figsize=(8, 6))
-plt.hist(accuracies, bins=20, color='skyblue', edgecolor='black')
+plt.hist(accuracies, bins=[-0.5, 0.5, 1.5], color='skyblue', edgecolor='black')
 plt.xlabel('Accuracy')
 plt.ylabel('Frequency')
 plt.title('Distribution of Accuracies (LOOCV)')
+plt.xticks([0, 1])
 plt.grid(True)
 plt.show()
